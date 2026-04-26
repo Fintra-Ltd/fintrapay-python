@@ -2,11 +2,19 @@
 
 Official Python SDK for the [FintraPay](https://fintrapay.io) crypto payment gateway API. Accept stablecoin payments, payment links, subscriptions, deposit API, payouts, withdrawals, and earn yield -- all with automatic HMAC-SHA256 request signing.
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://pypi.org/project/fintrapay/)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](https://pypi.org/project/fintrapay/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
 
 ---
+
+> ## ⚠️ v0.2.0 — Breaking change to webhook verification
+>
+> The webhook signature verifier now requires the `X-FintraPay-Timestamp` header
+> to support the v2 webhook envelope (`HMAC(timestamp + "\n" + body)`). Versions
+> prior to 0.2.0 silently rejected every legitimate v2 delivery.
+>
+> See [CHANGELOG.md](CHANGELOG.md) for the migration in your language.
 
 ## Installation
 
@@ -52,7 +60,7 @@ from xfintrapay.webhooks import verify_webhook_signature
 @app.route("/webhook", methods=["POST"])
 def webhook():
     sig = request.headers.get("X-FintraPay-Signature", "")
-    if not verify_webhook_signature(request.data, sig, WEBHOOK_SECRET):
+    if not verify_webhook_signature(request.data, sig, WEBHOOK_SECRET, timestamp=request.headers["X-FintraPay-Timestamp"]):
         return "Invalid signature", 401
 
     event = request.json
@@ -215,7 +223,7 @@ from xfintrapay.webhooks import verify_webhook_signature
 @app.route("/webhook", methods=["POST"])
 def webhook():
     sig = request.headers.get("X-FintraPay-Signature", "")
-    if not verify_webhook_signature(request.data, sig, WEBHOOK_SECRET):
+    if not verify_webhook_signature(request.data, sig, WEBHOOK_SECRET, timestamp=request.headers["X-FintraPay-Timestamp"]):
         return "Invalid signature", 401
     event = request.json
     # process event...
