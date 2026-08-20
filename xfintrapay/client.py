@@ -208,6 +208,7 @@ class FintraPay:
         blockchain: str,
         reason: str = "payment",
         reference: str = None,
+        fee_deduction: str = None,
     ) -> dict:
         """Create a single payout to any address."""
         body = {
@@ -251,13 +252,31 @@ class FintraPay:
 
     # ── Withdrawals ──────────────────────────────────────────────
 
-    def create_withdrawal(self, amount: str, currency: str, blockchain: str) -> dict:
-        """Withdraw to your registered wallet."""
-        return self._request("POST", "/withdrawals", {
+    def create_withdrawal(
+        self,
+        amount: str,
+        currency: str,
+        blockchain: str,
+        to_address: str = None,
+        fee_deduction: str = None,
+    ) -> dict:
+        """Withdraw custodial balance.
+
+        to_address defaults to the wallet registered for this chain on your
+        merchant profile. fee_deduction is "from_amount" (default -- the
+        recipient gets amount minus fees) or "from_balance" (the recipient
+        gets exactly amount and the fees are debited on top).
+        """
+        body = {
             "amount": str(amount),
             "currency": currency,
             "blockchain": blockchain,
-        })
+        }
+        if to_address is not None:
+            body["to_address"] = to_address
+        if fee_deduction is not None:
+            body["fee_deduction"] = fee_deduction
+        return self._request("POST", "/withdrawals", body)
 
     def get_withdrawal(self, withdrawal_id: str) -> dict:
         """Get withdrawal by ID."""
