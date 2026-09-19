@@ -220,6 +220,8 @@ class FintraPay:
         }
         if reference:
             body["reference"] = reference
+        if fee_deduction is not None:
+            body["fee_deduction"] = fee_deduction
         return self._request("POST", "/payouts", body)
 
     def create_batch_payout(
@@ -227,17 +229,25 @@ class FintraPay:
         currency: str,
         blockchain: str,
         recipients: List[dict],
+        fee_deduction: str = None,
     ) -> dict:
         """
         Create a batch payout.
 
         recipients: [{"to_address": "0x...", "amount": "50.00", "reference": "sal-001"}, ...]
+        fee_deduction applies to every recipient: "from_amount" (default --
+        each recipient gets amount minus the per-recipient fee) or
+        "from_balance" (each recipient gets exactly amount; fees are debited
+        from your balance on top).
         """
-        return self._request("POST", "/payouts/batch", {
+        body = {
             "currency": currency,
             "blockchain": blockchain,
             "recipients": recipients,
-        })
+        }
+        if fee_deduction is not None:
+            body["fee_deduction"] = fee_deduction
+        return self._request("POST", "/payouts/batch", body)
 
     def get_payout(self, payout_id: str) -> dict:
         """Get payout by ID."""
