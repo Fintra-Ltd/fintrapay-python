@@ -100,6 +100,28 @@ All methods are available on the `FintraPay` client instance. HMAC-SHA256 signin
 | `get_withdrawal(withdrawal_id)` | Get withdrawal by ID |
 | `list_withdrawals(page, page_size)` | List withdrawals |
 
+### Internal Transfers
+
+Move balance to another FintraPay merchant. Settles on the ledger — instant,
+irreversible, and no network fee. The confirmation code is emailed to **you**,
+the sender.
+
+| Method | Description |
+|--------|-------------|
+| `lookup_transfer_recipient(email)` | Check an email belongs to a merchant you can send to |
+| `request_transfer_otp(to_email, amount, currency, blockchain, note)` | Validate and email yourself a confirmation code |
+| `create_transfer(to_email, amount, currency, blockchain, otp, note)` | Send the transfer |
+| `list_transfers(page, page_size)` | List transfers in both directions |
+
+### Overpayment
+
+When a customer pays more than the invoice, decide what happens to the excess.
+
+| Method | Description |
+|--------|-------------|
+| `accept_overpayment(invoice_id)` | Keep it — credit the excess to your balance |
+| `refund_overpayment(invoice_id)` | Return it to the sender's address |
+
 ### Earn
 
 | Method | Description |

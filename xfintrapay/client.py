@@ -5,7 +5,7 @@ import hmac
 import json
 import time
 from typing import Any, Dict, List, Optional
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
 
 import requests
 
@@ -296,6 +296,77 @@ class FintraPay:
         """List withdrawals."""
         return self._request("GET", f"/withdrawals?page={page}&page_size={page_size}")
 
+    # ── Internal transfers ───────────────────────────────────────
+
+    def lookup_transfer_recipient(self, email: str) -> dict:
+        """Check whether an email belongs to a merchant you can send to.
+
+        Returns the recipient's display details, never their merchant id --
+        create_transfer re-resolves the email server-side. Rate limited, so it
+        cannot be used to enumerate merchants.
+        """
+        return self._request("GET", f"/transfers/lookup?email={quote(email, safe='')}")
+
+    def request_transfer_otp(
+        self,
+        to_email: str,
+        amount: str,
+        currency: str,
+        blockchain: str,
+        note: str = None,
+    ) -> dict:
+        """Validate a transfer and email a confirmation code to YOUR address.
+
+        The code is never in the response -- that would defeat emailing it.
+        Returns {"sent", "otp_required", ...}; when otp_required is False the
+        code is waived for this account and create_transfer may be called with
+        no otp.
+        """
+        return self._request("POST", "/transfers/otp",
+                             _transfer_body(to_email, amount, currency, blockchain, note))
+
+    def create_transfer(
+        self,
+        to_email: str,
+        amount: str,
+        currency: str,
+        blockchain: str,
+        otp: str = None,
+        note: str = None,
+    ) -> dict:
+        """Send balance to another FintraPay merchant. Instant and IRREVERSIBLE.
+
+        Settles on the ledger -- no on-chain transaction and no network fee.
+        otp is the code from request_transfer_otp; omit it only when that call
+        returned otp_required False.
+        """
+        body = _transfer_body(to_email, amount, currency, blockchain, note)
+        if otp is not None:
+            body["otp"] = otp
+        return self._request("POST", "/transfers", body)
+
+    def list_transfers(self, page: int = 1, page_size: int = 50) -> dict:
+        """List transfers in BOTH directions.
+
+        Each row carries direction ("in" or "out") and the counterparty, so the
+        same call covers money sent and received.
+        """
+        return self._request("GET", f"/transfers?page={page}&page_size={page_size}")
+
+    # ── Overpayment ──────────────────────────────────────────────
+
+    def accept_overpayment(self, invoice_id: str) -> dict:
+        """Keep an overpayment: credit the excess to your balance."""
+        return self._request("POST", f"/invoices/{invoice_id}/overpayment/accept")
+
+    def refund_overpayment(self, invoice_id: str) -> dict:
+        """Return an overpayment to the sender's address.
+
+        Queues the refund; it is not broadcast synchronously. Poll the invoice
+        or listen for the webhook to see it complete.
+        """
+        return self._request("POST", f"/invoices/{invoice_id}/overpayment/refund")
+
     # ── Earn ─────────────────────────────────────────────────────
 
     def create_earn_contract(
@@ -584,3 +655,20 @@ class FintraPay:
     def list_deposit_balances(self, external_user_id: str) -> dict:
         """Get per-token per-chain balances for a deposit user."""
         return self._request("GET", f"/deposit-api/users/{external_user_id}/balances")
+
+
+def _transfer_body(to_email, amount, currency, blockchain, note):
+    """Shared body for the OTP request and the transfer itself.
+
+    Both endpoints take the SAME shape -- the OTP is bound to these exact
+    details, so a body that differs between the two calls invalidates the code.
+    """
+    body = {
+        "to_email": to_email,
+        "amount": str(amount),
+        "currency": currency,
+        "blockchain": blockchain,
+    }
+    if note is not None:
+        body["note"] = note
+    return body
